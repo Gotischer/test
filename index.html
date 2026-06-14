@@ -250,13 +250,74 @@
                     const nameLower = name.toLowerCase();
                     const is51 = nameLower.includes('5.1') || nameLower.includes('surround') || nameLower.includes('eac3_6') || channels === '6' || channels === '5.1';
                     
-                    console.log(`Cambio manual a pista: ${trackIndex}`);
+                    console.log(`Cambio manual a pista (HLS): ${trackIndex}`);
+                    updateUI(name, is51);
+                } else if (video.audioTracks) {
+                    for (let i = 0; i < video.audioTracks.length; i++) {
+                        video.audioTracks[i].enabled = (i === trackIndex);
+                    }
+                    const track = video.audioTracks[trackIndex];
+                    const name = track.label || track.language || `Pista ${trackIndex}`;
+                    const nameLower = name.toLowerCase();
+                    const is51 = nameLower.includes('5.1') || nameLower.includes('surround') || nameLower.includes('eac3_6');
+                    console.log(`Cambio manual a pista (Nativa): ${trackIndex}`);
                     updateUI(name, is51);
                 }
             });
 
-            // Inicializar HLS.js si es compatible
-            if (Hls.isSupported()) {
+            // Detección de Smart TVs y Safari
+            const ua = navigator.userAgent.toLowerCase();
+            const isTizen = ua.includes('tizen');
+            const isWebOS = ua.includes('webos');
+            const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+            
+            // Priorizar nativo para Tizen, WebOS y Safari, ya que soportan HEVC y EAC3 nativamente
+            const preferNative = isTizen || isWebOS || isSafari;
+
+            function setupNativeTracks() {
+                if (video.audioTracks && video.audioTracks.length > 0) {
+                    audioTrackSelector.style.display = 'block';
+                    audioTrackSelector.innerHTML = '';
+                    let targetIndex = -1;
+                    
+                    for (let i = 0; i < video.audioTracks.length; i++) {
+                        const track = video.audioTracks[i];
+                        const name = track.label || track.language || `Pista ${i}`;
+                        const nameLower = name.toLowerCase();
+                        
+                        const option = document.createElement('option');
+                        option.value = i;
+                        option.textContent = name;
+                        audioTrackSelector.appendChild(option);
+                        
+                        if (targetIndex === -1 && (nameLower.includes('5.1') || nameLower.includes('surround') || nameLower.includes('eac3_6'))) {
+                            targetIndex = i;
+                        }
+                    }
+                    
+                    if (targetIndex !== -1) {
+                        for (let i = 0; i < video.audioTracks.length; i++) {
+                            video.audioTracks[i].enabled = (i === targetIndex);
+                        }
+                        audioTrackSelector.value = targetIndex;
+                        const track = video.audioTracks[targetIndex];
+                        updateUI((track.label || track.language || `Pista ${targetIndex}`) + ' (5.1)', true);
+                    } else {
+                        let activeIndex = 0;
+                        for (let i = 0; i < video.audioTracks.length; i++) {
+                            if (video.audioTracks[i].enabled) activeIndex = i;
+                        }
+                        audioTrackSelector.value = activeIndex;
+                        const track = video.audioTracks[activeIndex];
+                        updateUI((track ? (track.label || track.language) : 'Estándar'), false);
+                    }
+                } else {
+                    updateUI('Soporte Nativo TV/Safari (Usa el control remoto para audio)', false);
+                }
+            }
+
+            // Inicializar HLS.js si es compatible y no es Tizen/Safari
+            if (!preferNative && Hls.isSupported()) {
                 const hls = new Hls({
                     debug: false,
                     enableWorker: true,
@@ -266,24 +327,15 @@
                 hls.loadSource(videoSrc);
                 hls.attachMedia(video);
 
-                window.hlsPlayer = hls; // Guardar referencia para el selector
+                window.hlsPlayer = hls;
 
-                // Cuando el manifiesto principal se ha cargado
                 hls.on(Hls.Events.MANIFEST_PARSED, function () {
                     console.log('Manifiesto HLS cargado.');
-                    
-                    // Esperar un poco para asegurar que las pistas de audio se hayan poblado
                     setTimeout(() => {
                         processAudioTracks(hls);
                     }, 500);
                 });
 
-                // Escuchar si hay cambios dinámicos en las pistas
-                hls.on(Hls.Events.AUDIO_TRACK_LOADED, function() {
-                    // Podemos volver a evaluar si se cargan pistas tarde
-                });
-
-                // Manejo básico de errores para intentar recuperar
                 hls.on(Hls.Events.ERROR, function (event, data) {
                     if (data.fatal) {
                         switch (data.type) {
@@ -301,12 +353,19 @@
                 });
 
             } 
-            // Fallback para Safari y navegadores con soporte nativo
-            else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            // Fallback para Tizen, Safari y otros con soporte nativo
+            else if (preferNative || video.canPlayType('application/vnd.apple.mpegurl')) {
                 video.src = videoSrc;
                 video.addEventListener('loadedmetadata', function () {
-                    updateUI('Soporte nativo (Ver controles para cambiar pista)', false);
+                    // Algunos navegadores nativos exponen las pistas de audio tarde
+                    setTimeout(setupNativeTracks, 800);
                 });
+                
+                if (video.audioTracks) {
+                    video.audioTracks.onaddtrack = setupNativeTracks;
+                }
+            } else {
+                updateUI('Tu navegador no es compatible con la reproducción HLS.', false);
             }
         });
     </script>
