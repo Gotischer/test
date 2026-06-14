@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Smart TV HLS Player</title>
+    
+    <!-- Shaka Player: Optimizada para Tizen (Samsung) y WebOS (LG) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js"></script>
+    
+    <style>
+        :root {
+            --bg-color: #000000;
+            --container-bg: #0f172a;
+            --text-main: #f8fafc;
+            --accent: #3b82f6;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden; /* Importante para TVs */
+        }
+
+        .player-container {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 25px 40px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
+            z-index: 10;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            font-weight: 600;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .badge {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .badge-warning { background-color: rgba(245, 158, 11, 0.9); color: #fff; }
+        .badge-success { background-color: rgba(16, 185, 129, 0.9); color: #fff; }
+        .badge-error { background-color: rgba(239, 68, 68, 0.9); color: #fff; }
+
+        .video-wrapper {
+            flex-grow: 1;
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #000;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain; /* Mantener la proporción en pantallas grandes */
+        }
+
+        .footer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 25px 40px;
+            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+            z-index: 10;
+        }
+
+        .status-text {
+            font-size: 1.2rem;
+            font-weight: 500;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+        }
+
+        select {
+            background-color: rgba(15, 23, 42, 0.9);
+            color: var(--text-main);
+            border: 2px solid #334155;
+            padding: 10px 15px;
+            border-radius: 8px;
+            outline: none;
+            cursor: pointer;
+            font-size: 1.1rem;
+            font-family: inherit;
+        }
+        
+        select:focus {
+            border-color: var(--accent);
+            background-color: rgba(30, 41, 59, 1);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="player-container">
+        <div class="header">
+            <h1>TV Smart Player (Shaka)</h1>
+            <div id="status-badge" class="badge badge-warning">Inicializando...</div>
+        </div>
+
+        <div class="video-wrapper">
+            <video id="video" controls autoplay></video>
+        </div>
+
+        <div class="footer">
+            <div id="current-track-name" class="status-text">Audio y Video: Analizando...</div>
+            <div class="controls">
+                <select id="quality-selector" style="display: none;">
+                    <option value="auto">Calidad: Automática</option>
+                </select>
+                <select id="audio-track-selector" style="display: none;">
+                    <option value="">Audio...</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', initApp);
+
+        // URL del video (Sling TV HLS - Atento a expiración de token)
+        const videoSrc = 'https://nl-081-v1.vivocdn.xyz/1781472178/d287fcfed23a47848a33fe52f1299d4a/ysn6G-5tFnV68rmJ3RqsVMfRoSVVvmJGD6XSWQGAkXk/fox4k-usa.m3u8';
+        
+        const video = document.getElementById('video');
+        const statusBadge = document.getElementById('status-badge');
+        const currentTrackName = document.getElementById('current-track-name');
+        const audioSelector = document.getElementById('audio-track-selector');
+        const qualitySelector = document.getElementById('quality-selector');
+        
+        let player;
+
+        function updateStatus(message, type = 'warning') {
+            statusBadge.textContent = message;
+            statusBadge.className = `badge badge-${type}`;
+        }
+
+        async function initApp() {
+            // Instalar polyfills requeridos por televisores
+            shaka.polyfill.installAll();
+
+            if (shaka.Player.isBrowserSupported()) {
+                initPlayer();
+            } else {
+                updateStatus('Navegador TV no soportado', 'error');
+                // Fallback extremo
+                video.src = videoSrc;
+                video.play().catch(e => console.log('Autoplay bloqueado', e));
+            }
+        }
+
+        async function initPlayer() {
+            player = new shaka.Player(video);
+            player.addEventListener('error', onErrorEvent);
+
+            // Forzar preferencia de audio a 6 canales (5.1) si está disponible
+            player.configure({
+                preferredAudioChannelCount: 6,
+                abr: { enabled: true } // Calidad automática
+            });
+
+            try {
+                updateStatus('Cargando flujo de video...', 'warning');
+                await player.load(videoSrc);
+                console.log('Video cargado exitosamente.');
+                setupSelectors();
+            } catch (e) {
+                onError(e);
+            }
+        }
+
+        function setupSelectors() {
+            const tracks = player.getVariantTracks();
+            
+            // FILTRAR AUDIOS ÚNICOS
+            const uniqueAudios = [];
+            tracks.forEach(t => {
+                const isDuplicate = uniqueAudios.find(a => a.language === t.language && a.channelsCount === t.channelsCount && a.audioCodec === t.audioCodec);
+                if (!isDuplicate) {
+                    uniqueAudios.push(t);
+                }
+            });
+
+            if (uniqueAudios.length > 0) {
+                audioSelector.innerHTML = '';
+                audioSelector.style.display = 'block';
+                let found51 = false;
+                
+                uniqueAudios.forEach((track) => {
+                    const option = document.createElement('option');
+                    option.value = track.id; // Usamos ID de variante como referencia
+                    const codecName = track.audioCodec || '';
+                    const channels = track.channelsCount || 2;
+                    const isSurround = channels >= 6 || codecName.includes('ec-3') || codecName.includes('ac-3');
+                    
+                    option.textContent = `${track.language || 'Audio'} ${isSurround ? '(5.1 Surround)' : '(Estéreo)'}`;
+                    audioSelector.appendChild(option);
+                    
+                    if (isSurround) found51 = true;
+                });
+                
+                if (found51) {
+                    updateStatus('5.1 Surround Detectado', 'success');
+                } else {
+                    updateStatus('Audio Estándar', 'warning');
+                }
+            }
+
+            // FILTRAR RESOLUCIONES ÚNICAS
+            const uniqueVideos = [];
+            tracks.forEach(t => {
+                const isDuplicate = uniqueVideos.find(v => v.height === t.height && v.bandwidth === t.bandwidth);
+                if (!isDuplicate && t.height) {
+                    uniqueVideos.push(t);
+                }
+            });
+
+            uniqueVideos.sort((a, b) => b.bandwidth - a.bandwidth); // Mayor a menor
+
+            if (uniqueVideos.length > 0) {
+                qualitySelector.style.display = 'block';
+                qualitySelector.innerHTML = '<option value="auto">Calidad: Automática</option>';
+                uniqueVideos.forEach(track => {
+                    const option = document.createElement('option');
+                    option.value = track.id;
+                    option.textContent = `${track.height}p (${Math.round(track.bandwidth/1000)} kbps)`;
+                    qualitySelector.appendChild(option);
+                });
+            }
+
+            // EVENTOS DE CAMBIO
+            audioSelector.addEventListener('change', (e) => {
+                const trackId = parseInt(e.target.value, 10);
+                const track = tracks.find(t => t.id === trackId);
+                if (track) {
+                    // Cambiar las preferencias de audio (mantiene video dinámico)
+                    player.configure({
+                        preferredAudioLanguage: track.language,
+                        preferredAudioChannelCount: track.channelsCount
+                    });
+                }
+            });
+
+            qualitySelector.addEventListener('change', (e) => {
+                const val = e.target.value;
+                if (val === 'auto') {
+                    // Restaurar ABR sin restricciones de altura
+                    player.configure({
+                        abr: { enabled: true, restrictions: { minHeight: 0, maxHeight: Infinity } }
+                    });
+                } else {
+                    const trackId = parseInt(val, 10);
+                    const track = tracks.find(t => t.id === trackId);
+                    if (track) {
+                        // Forzar una resolución específica limitando el ABR
+                        player.configure({
+                            abr: { restrictions: { minHeight: track.height, maxHeight: track.height } }
+                        });
+                    }
+                }
+            });
+
+            // Actualizar interfaz cuando Shaka cambia de variante
+            player.addEventListener('adaptation', updateAudioUI);
+            player.addEventListener('variantchanged', updateAudioUI);
+            
+            // Primera actualización
+            updateAudioUI();
+        }
+
+        function updateAudioUI() {
+            const tracks = player.getVariantTracks();
+            const active = tracks.find(t => t.active);
+            if (active) {
+                const channels = active.channelsCount || 2;
+                const codecName = active.audioCodec || '';
+                const isSurround = channels >= 6 || codecName.includes('ec-3');
+                
+                currentTrackName.textContent = `Audio: ${active.language || 'Defecto'} ${isSurround ? '(5.1)' : '(Estéreo)'} | Video: ${active.height ? active.height + 'p' : 'Auto'}`;
+                
+                if (isSurround) {
+                    updateStatus('5.1 Surround Activo', 'success');
+                } else {
+                    updateStatus('Audio Estándar', 'warning');
+                }
+            }
+        }
+
+        function onErrorEvent(event) {
+            onError(event.detail);
+        }
+
+        function onError(error) {
+            console.error('Error de Shaka Player:', error);
+            // El error 1002 de Shaka corresponde a BAD_HTTP_STATUS
+            if (error.code === shaka.util.Error.Code.BAD_HTTP_STATUS) {
+                updateStatus('Error: El enlace HLS caducó (403)', 'error');
+                currentTrackName.textContent = 'Por favor, renueva el enlace (token expirado).';
+            } else {
+                updateStatus(`Error interno (${error.code})`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>
