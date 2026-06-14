@@ -1,395 +1,200 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HLS Video Player - 5.1 Audio</title>
-    <!-- Incluir la librería de HLS.js -->
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.0/dist/hls.min.js"></script>
+    <title>Reproductor HLS - Tizen & Web</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
     <style>
-        :root {
-            --bg-color: #0f172a;
-            --container-bg: #1e293b;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --accent: #3b82f6;
-            --success: #10b981;
-            --warning: #f59e0b;
-        }
-
         body {
-            margin: 0;
-            padding: 0;
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-        }
-
-        .player-container {
-            width: 90%;
-            max-width: 1000px;
-            background: var(--container-bg);
-            padding: 24px;
-            border-radius: 16px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-bottom: 16px;
-            border-bottom: 1px solid #334155;
-        }
-
-        h1 {
             margin: 0;
-            font-size: 1.5rem;
-            font-weight: 600;
-            letter-spacing: 0.5px;
         }
 
-        .badge {
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.3s ease;
-        }
-
-        .badge-warning {
-            background-color: rgba(245, 158, 11, 0.2);
-            color: var(--warning);
-            border: 1px solid rgba(245, 158, 11, 0.3);
-        }
-
-        .badge-success {
-            background-color: rgba(16, 185, 129, 0.2);
-            color: var(--success);
-            border: 1px solid rgba(16, 185, 129, 0.3);
-        }
-
-        .video-wrapper {
-            position: relative;
-            width: 100%;
-            border-radius: 12px;
-            overflow: hidden;
-            background: #000;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        .container {
+            width: 90%;
+            max-width: 800px;
+            text-align: center;
         }
 
         video {
             width: 100%;
-            display: block;
-            aspect-ratio: 16 / 9;
-        }
-
-        .footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.9rem;
-            color: var(--text-muted);
-            background: rgba(0,0,0,0.2);
-            padding: 12px 16px;
+            background-color: #000;
             border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
         }
 
-        .track-info {
+        .controls {
+            margin-top: 15px;
             display: flex;
-            align-items: center;
-            gap: 8px;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
         }
 
-        .track-info svg {
-            width: 18px;
-            height: 18px;
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
         }
 
-        select.track-selector {
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            border: 1px solid #334155;
-            padding: 6px 12px;
-            border-radius: 6px;
-            outline: none;
+        label {
+            font-size: 12px;
+            margin-bottom: 5px;
+            color: #aaa;
+        }
+
+        select {
+            background-color: #222;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 8px 12px;
+            border-radius: 4px;
             cursor: pointer;
-            font-family: inherit;
-            font-size: 0.85rem;
-        }
-        
-        select.track-selector:focus {
-            border-color: var(--accent);
         }
 
+        select:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
     </style>
 </head>
+
 <body>
 
-    <div class="player-container">
-        <div class="header">
-            <h1>Reproductor HLS 4K</h1>
-            <div id="status-badge" class="badge badge-warning">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                Buscando pista 5.1...
-            </div>
-        </div>
+    <div class="container">
+        <h2>Reproductor Fox 4K</h2>
 
-        <div class="video-wrapper">
-            <video id="video" controls crossorigin="anonymous"></video>
-        </div>
+        <video id="video" controls autoplay playsinline muted></video>
 
-        <div class="footer">
-            <div class="track-info">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
-                <span id="current-track-name">Pista de audio: Analizando...</span>
-            </div>
-            <div style="display: flex; gap: 10px;">
-                <select id="quality-selector" class="track-selector" style="display: none;">
-                    <option value="-1">Calidad Auto</option>
+        <div class="controls">
+            <div class="control-group">
+                <label for="qualitySelect">Calidad de Video:</label>
+                <select id="qualitySelect" disabled>
+                    <option>Cargando...</option>
                 </select>
-                <select id="audio-track-selector" class="track-selector" style="display: none;">
-                    <option value="">Cargando pistas...</option>
+            </div>
+
+            <div class="control-group">
+                <label for="audioSelect">Idioma de Audio:</label>
+                <select id="audioSelect" disabled>
+                    <option>Cargando...</option>
                 </select>
             </div>
         </div>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const video = document.getElementById('video');
-            const statusBadge = document.getElementById('status-badge');
-            const currentTrackName = document.getElementById('current-track-name');
-            const audioTrackSelector = document.getElementById('audio-track-selector');
-            const qualitySelector = document.getElementById('quality-selector');
-            const videoSrc = 'https://nl-081-v1.vivocdn.xyz/1781474995/c075a3b56e6144ef9ab2638dea205f34/qHwDja898rB6sB4eV3OmDdj4IfndP_vZIg7ezk8CVWw/fox4k-usa.m3u8';
+        const video = document.getElementById('video');
+        const qualitySelect = document.getElementById('qualitySelect');
+        const audioSelect = document.getElementById('audioSelect');
 
-            // Función para actualizar la interfaz
-            function updateUI(message, is51) {
-                currentTrackName.textContent = 'Pista de audio: ' + message;
-                
-                if (is51) {
-                    statusBadge.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> 5.1 Surround Activo';
-                    statusBadge.className = 'badge badge-success';
-                } else {
-                    statusBadge.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg> Audio Estándar';
-                    statusBadge.className = 'badge badge-warning';
-                }
-            }
+        // Tu enlace de streaming
+        const streamUrl = 'https://nl-081-v1.vivocdn.xyz/1781474995/c075a3b56e6144ef9ab2638dea205f34/qHwDja898rB6sB4eV3OmDdj4IfndP_vZIg7ezk8CVWw/fox4k-usa.m3u8';
 
-            // Función para rellenar el selector y buscar 5.1
-            function processAudioTracks(hlsInstance) {
-                const audioTracks = hlsInstance.audioTracks;
-                console.log('Pistas de audio detectadas:', audioTracks);
-
-                if (!audioTracks || audioTracks.length === 0) {
-                    updateUI('No se detectaron múltiples pistas', false);
-                    return;
-                }
-
-                // Limpiar y mostrar el selector
-                audioTrackSelector.innerHTML = '';
-                audioTrackSelector.style.display = 'block';
-
-                let targetTrackIndex = -1;
-                let foundTrackName = '';
-
-                // Iterar sobre las pistas para rellenar el selector y buscar 5.1
-                for (let i = 0; i < audioTracks.length; i++) {
-                    const track = audioTracks[i];
-                    const nameOriginal = track.name || `Pista ${i}`;
-                    const nameLower = nameOriginal.toLowerCase();
-                    const group = (track.groupId || '').toLowerCase();
-                    const channels = String(track.channels || '');
-                    
-                    const option = document.createElement('option');
-                    option.value = i;
-                    option.textContent = `${nameOriginal} ${channels ? '('+channels+' ch)' : ''}`;
-                    audioTrackSelector.appendChild(option);
-
-                    // Criterios de búsqueda: el nombre contiene '5.1', 'surround', 'eac3_6', o el canal indica '6' o '5.1'
-                    if (targetTrackIndex === -1 && (nameLower.includes('5.1') || nameLower.includes('surround') || nameLower.includes('eac3_6') || channels === '6' || channels === '5.1' || group.includes('5.1') || group.includes('eac3_6'))) {
-                        targetTrackIndex = i;
-                        foundTrackName = nameOriginal;
-                    }
-                }
-
-                if (targetTrackIndex !== -1) {
-                    // Seleccionar la pista 5.1 automáticamente
-                    hlsInstance.audioTrack = targetTrackIndex;
-                    audioTrackSelector.value = targetTrackIndex;
-                    console.log(`Seleccionando pista 5.1: Índice ${targetTrackIndex}`);
-                    updateUI(foundTrackName, true);
-                } else {
-                    // Si no se encuentra, usar la actual
-                    const currentId = hlsInstance.audioTrack !== -1 ? hlsInstance.audioTrack : 0;
-                    audioTrackSelector.value = currentId;
-                    const activeTrack = audioTracks[currentId];
-                    const activeName = activeTrack ? (activeTrack.name || 'Estéreo por defecto') : 'Estéreo';
-                    console.log('No se encontró pista 5.1. Manteniendo pista actual.');
-                    updateUI(activeName + ' (No 5.1)', false);
-                }
-            }
-
-            // Manejar cambio manual de pista
-            audioTrackSelector.addEventListener('change', (e) => {
-                const trackIndex = parseInt(e.target.value, 10);
-                if (window.hlsPlayer) {
-                    window.hlsPlayer.audioTrack = trackIndex;
-                    const track = window.hlsPlayer.audioTracks[trackIndex];
-                    const name = track.name || `Pista ${trackIndex}`;
-                    const channels = String(track.channels || '');
-                    const nameLower = name.toLowerCase();
-                    const is51 = nameLower.includes('5.1') || nameLower.includes('surround') || nameLower.includes('eac3_6') || channels === '6' || channels === '5.1';
-                    
-                    console.log(`Cambio manual a pista (HLS): ${trackIndex}`);
-                    updateUI(name, is51);
-                } else if (video.audioTracks) {
-                    for (let i = 0; i < video.audioTracks.length; i++) {
-                        video.audioTracks[i].enabled = (i === trackIndex);
-                    }
-                    const track = video.audioTracks[trackIndex];
-                    const name = track.label || track.language || `Pista ${trackIndex}`;
-                    const nameLower = name.toLowerCase();
-                    const is51 = nameLower.includes('5.1') || nameLower.includes('surround') || nameLower.includes('eac3_6');
-                    console.log(`Cambio manual a pista (Nativa): ${trackIndex}`);
-                    updateUI(name, is51);
-                }
+        if (Hls.isSupported()) {
+            const hls = new Hls({
+                // Configuraciones óptimas para Smart TVs
+                capLevelToPlayerSize: false,
+                lowLatencyMode: true
             });
 
-            // Detección de Smart TVs y Safari
-            const ua = navigator.userAgent.toLowerCase();
-            const isTizen = ua.includes('tizen');
-            const isWebOS = ua.includes('webos');
-            const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-            
-            // Priorizar nativo para Tizen, WebOS y Safari, ya que soportan HEVC y EAC3 nativamente
-            const preferNative = isTizen || isWebOS || isSafari;
+            hls.loadSource(streamUrl);
+            hls.attachMedia(video);
 
-            function setupNativeTracks() {
-                if (video.audioTracks && video.audioTracks.length > 0) {
-                    audioTrackSelector.style.display = 'block';
-                    audioTrackSelector.innerHTML = '';
-                    let targetIndex = -1;
-                    
-                    for (let i = 0; i < video.audioTracks.length; i++) {
-                        const track = video.audioTracks[i];
-                        const name = track.label || track.language || `Pista ${i}`;
-                        const nameLower = name.toLowerCase();
-                        
-                        const option = document.createElement('option');
-                        option.value = i;
-                        option.textContent = name;
-                        audioTrackSelector.appendChild(option);
-                        
-                        if (targetIndex === -1 && (nameLower.includes('5.1') || nameLower.includes('surround') || nameLower.includes('eac3_6'))) {
-                            targetIndex = i;
-                        }
-                    }
-                    
-                    if (targetIndex !== -1) {
-                        for (let i = 0; i < video.audioTracks.length; i++) {
-                            video.audioTracks[i].enabled = (i === targetIndex);
-                        }
-                        audioTrackSelector.value = targetIndex;
-                        const track = video.audioTracks[targetIndex];
-                        updateUI((track.label || track.language || `Pista ${targetIndex}`) + ' (5.1)', true);
-                    } else {
-                        let activeIndex = 0;
-                        for (let i = 0; i < video.audioTracks.length; i++) {
-                            if (video.audioTracks[i].enabled) activeIndex = i;
-                        }
-                        audioTrackSelector.value = activeIndex;
-                        const track = video.audioTracks[activeIndex];
-                        updateUI((track ? (track.label || track.language) : 'Estándar'), false);
-                    }
-                } else {
-                    updateUI('Soporte Nativo TV/Safari (Usa el control remoto para audio)', false);
-                }
-            }
+            hls.on(Hls.Events.MANIFEST_PARSED, function () {
+                // 1. Configurar Selector de Calidad
+                setupQualityTracks(hls);
+                // 2. Configurar Selector de Audio
+                setupAudioTracks(hls);
+            });
 
-            // Inicializar HLS.js si es compatible y no es Tizen/Safari
-            if (!preferNative && Hls.isSupported()) {
-                const hls = new Hls({
-                    debug: false,
-                    enableWorker: true,
-                    lowLatencyMode: true
+            // Escuchar cuando cambien los tracks de audio internamente (por si acaso)
+            hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, function () {
+                setupAudioTracks(hls);
+            });
+
+        }
+        // Soporte nativo (Safari en iOS/Mac y algunas versiones específicas de Tizen viejas)
+        else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = streamUrl;
+            video.addEventListener('loadedmetadata', function () {
+                // Nota: El control nativo de pistas de audio/video en HTML5 puro 
+                // depende enteramente de los controles por defecto del navegador/TV.
+                qualitySelect.innerHTML = '<option>Automático (Nativo del sistema)</option>';
+                audioSelect.innerHTML = '<option>Por defecto (Nativo del sistema)</option>';
+            });
+        }
+
+        // Funciones para llenar y controlar los Selects con Hls.js
+
+        function setupQualityTracks(hls) {
+            const levels = hls.levels;
+            qualitySelect.innerHTML = ''; // Limpiar
+
+            if (levels && levels.length > 0) {
+                qualitySelect.disabled = false;
+
+                // Opción Automática
+                const autoOption = document.createElement('option');
+                autoOption.value = '-1';
+                autoOption.text = 'Automático';
+                qualitySelect.appendChild(autoOption);
+
+                // Añadir las calidades disponibles en el .m3u8
+                levels.forEach((level, index) => {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    // Si el m3u8 no tiene el nombre de la resolución, usamos la altura (height)
+                    const name = level.name || `${level.height}p` || `Opción ${index}`;
+                    option.text = name;
+                    qualitySelect.appendChild(option);
                 });
 
-                hls.loadSource(videoSrc);
-                hls.attachMedia(video);
-
-                window.hlsPlayer = hls;
-
-                hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
-                    console.log('Manifiesto HLS cargado.');
-                    
-                    // Configurar selector de calidades (solo disponible en HLS.js)
-                    if (data && data.levels) {
-                        qualitySelector.style.display = 'block';
-                        qualitySelector.innerHTML = '<option value="-1">Calidad Auto</option>';
-                        data.levels.forEach((level, index) => {
-                            const option = document.createElement('option');
-                            option.value = index;
-                            option.textContent = (level.height ? level.height + 'p ' : '') + Math.round(level.bitrate / 1000) + ' kbps';
-                            qualitySelector.appendChild(option);
-                        });
-                        
-                        qualitySelector.addEventListener('change', (e) => {
-                            hls.currentLevel = parseInt(e.target.value, 10);
-                        });
-                    }
-
-                    setTimeout(() => {
-                        processAudioTracks(hls);
-                    }, 500);
+                // Evento de cambio de calidad
+                qualitySelect.addEventListener('change', (e) => {
+                    hls.currentLevel = parseInt(e.target.value);
                 });
-
-                hls.on(Hls.Events.ERROR, function (event, data) {
-                    if (data.fatal) {
-                        switch (data.type) {
-                            case Hls.ErrorTypes.NETWORK_ERROR:
-                                hls.startLoad();
-                                break;
-                            case Hls.ErrorTypes.MEDIA_ERROR:
-                                hls.recoverMediaError();
-                                break;
-                            default:
-                                hls.destroy();
-                                break;
-                        }
-                    }
-                });
-
-            } 
-            // Fallback para Tizen, Safari y otros con soporte nativo
-            else if (preferNative || video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = videoSrc;
-                video.addEventListener('loadedmetadata', function () {
-                    video.play().catch(e => console.log('Autoplay bloqueado', e));
-                    // Algunos navegadores nativos exponen las pistas de audio tarde
-                    setTimeout(setupNativeTracks, 800);
-                });
-                
-                if (video.audioTracks) {
-                    video.audioTracks.onaddtrack = setupNativeTracks;
-                }
             } else {
-                updateUI('Tu navegador no es compatible con la reproducción HLS.', false);
+                qualitySelect.innerHTML = '<option>Única calidad disponible</option>';
             }
-        });
+        }
+
+        function setupAudioTracks(hls) {
+            const audioTracks = hls.audioTracks;
+            audioSelect.innerHTML = ''; // Limpiar
+
+            if (audioTracks && audioTracks.length > 1) {
+                audioSelect.disabled = false;
+
+                audioTracks.forEach((track, index) => {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.text = track.name || track.lang || `Audio ${index + 1}`;
+                    if (index === hls.audioTrack) {
+                        option.selected = true;
+                    }
+                    audioSelect.appendChild(option);
+                });
+
+                // Evento de cambio de audio
+                audioSelect.addEventListener('change', (e) => {
+                    hls.audioTrack = parseInt(e.target.value);
+                });
+            } else {
+                audioSelect.innerHTML = '<option>Audio único / Estándar</option>';
+            }
+        }
     </script>
+
 </body>
+
 </html>
