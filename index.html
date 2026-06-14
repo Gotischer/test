@@ -4,194 +4,157 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reproductor HLS - Tizen & Web</title>
+    <title>Reproductor Optimizado TV & Web</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #121212;
-            color: #ffffff;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
+            background-color: #0b0b0b;
+            color: #fff;
+            text-align: center;
             margin: 0;
+            padding: 20px;
         }
 
-        .container {
-            width: 90%;
+        .player-box {
             max-width: 800px;
-            text-align: center;
+            margin: 0 auto;
         }
 
         video {
             width: 100%;
-            background-color: #000;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+            background: #000;
+            border-radius: 6px;
         }
 
         .controls {
             margin-top: 15px;
             display: flex;
-            gap: 15px;
+            gap: 10px;
             justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        .control-group {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-        }
-
-        label {
-            font-size: 12px;
-            margin-bottom: 5px;
-            color: #aaa;
         }
 
         select {
-            background-color: #222;
+            background: #222;
             color: #fff;
+            padding: 8px;
             border: 1px solid #444;
-            padding: 8px 12px;
             border-radius: 4px;
-            cursor: pointer;
         }
 
-        select:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        .info-tag {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
         }
     </style>
 </head>
 
 <body>
 
-    <div class="container">
-        <h2>Reproductor Fox 4K</h2>
-
+    <div class="player-box">
+        <h2>Fox 4K Player</h2>
         <video id="video" controls autoplay playsinline muted></video>
 
         <div class="controls">
-            <div class="control-group">
-                <label for="qualitySelect">Calidad de Video:</label>
+            <div>
+                <label>Calidad:</label>
                 <select id="qualitySelect" disabled>
-                    <option>Cargando...</option>
+                    <option>Detectando...</option>
                 </select>
             </div>
-
-            <div class="control-group">
-                <label for="audioSelect">Idioma de Audio:</label>
+            <div>
+                <label>Audio:</label>
                 <select id="audioSelect" disabled>
-                    <option>Cargando...</option>
+                    <option>Detectando...</option>
                 </select>
             </div>
         </div>
+        <div id="modeInfo" class="info-tag"></div>
     </div>
 
     <script>
         const video = document.getElementById('video');
         const qualitySelect = document.getElementById('qualitySelect');
         const audioSelect = document.getElementById('audioSelect');
+        const modeInfo = document.getElementById('modeInfo');
 
-        // Tu enlace de streaming
         const streamUrl = 'https://nl-081-v1.vivocdn.xyz/1781474995/c075a3b56e6144ef9ab2638dea205f34/qHwDja898rB6sB4eV3OmDdj4IfndP_vZIg7ezk8CVWw/fox4k-usa.m3u8';
 
-        if (Hls.isSupported()) {
-            const hls = new Hls({
-                // Configuraciones óptimas para Smart TVs
-                capLevelToPlayerSize: false,
-                lowLatencyMode: true
+        // DETECCIÓN CRÍTICA: ¿Es una Smart TV o dispositivo similar?
+        const ua = navigator.userAgent.toLowerCase();
+        const isSmartTV = ua.includes("tizen") || ua.includes("smarttv") || ua.includes("googletv") || ua.includes("appletv") || ua.includes("lgbrowser");
+
+        // EJECUCIÓN SEGÚN EL ENTORNO
+        if (isSmartTV) {
+            // MODO TV: Máxima estabilidad, decodificación por hardware nativa para evitar congelamientos
+            modeInfo.innerText = "Modo: Smart TV (Reproducción Nativa por Hardware)";
+            video.src = streamUrl;
+
+            video.addEventListener('loadedmetadata', () => {
+                // En TV, el sistema adapta la calidad automáticamente (ABR) para evitar cortes
+                qualitySelect.innerHTML = '<option>Automático (Optimizado por TV)</option>';
+
+                // Intentar leer audios nativos si la TV los expone
+                if (video.audioTracks && video.audioTracks.length > 1) {
+                    audioSelect.disabled = false;
+                    audioSelect.innerHTML = '';
+                    for (let i = 0; i < video.audioTracks.length; i++) {
+                        let track = video.audioTracks[i];
+                        let opt = document.createElement('option');
+                        opt.value = i;
+                        opt.text = track.label || track.language || `Audio ${i + 1}`;
+                        if (track.enabled) opt.selected = true;
+                        audioSelect.appendChild(opt);
+                    }
+                    audioSelect.addEventListener('change', (e) => {
+                        for (let i = 0; i < video.audioTracks.length; i++) {
+                            video.audioTracks[i].enabled = (i == e.target.value);
+                        }
+                    });
+                } else {
+                    audioSelect.innerHTML = '<option>Por defecto de la señal</option>';
+                }
             });
 
+        } else if (Hls.isSupported()) {
+            // MODO WEB: Navegadores de PC/Móviles donde JS sí tiene potencia para procesar
+            modeInfo.innerText = "Modo: Web Estándar (Hls.js)";
+            const hls = new Hls();
             hls.loadSource(streamUrl);
             hls.attachMedia(video);
 
-            hls.on(Hls.Events.MANIFEST_PARSED, function () {
-                // 1. Configurar Selector de Calidad
-                setupQualityTracks(hls);
-                // 2. Configurar Selector de Audio
-                setupAudioTracks(hls);
-            });
-
-            // Escuchar cuando cambien los tracks de audio internamente (por si acaso)
-            hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, function () {
-                setupAudioTracks(hls);
-            });
-
-        }
-        // Soporte nativo (Safari en iOS/Mac y algunas versiones específicas de Tizen viejas)
-        else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            video.src = streamUrl;
-            video.addEventListener('loadedmetadata', function () {
-                // Nota: El control nativo de pistas de audio/video en HTML5 puro 
-                // depende enteramente de los controles por defecto del navegador/TV.
-                qualitySelect.innerHTML = '<option>Automático (Nativo del sistema)</option>';
-                audioSelect.innerHTML = '<option>Por defecto (Nativo del sistema)</option>';
-            });
-        }
-
-        // Funciones para llenar y controlar los Selects con Hls.js
-
-        function setupQualityTracks(hls) {
-            const levels = hls.levels;
-            qualitySelect.innerHTML = ''; // Limpiar
-
-            if (levels && levels.length > 0) {
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                // Configurar Calidades en PC
                 qualitySelect.disabled = false;
-
-                // Opción Automática
-                const autoOption = document.createElement('option');
-                autoOption.value = '-1';
-                autoOption.text = 'Automático';
-                qualitySelect.appendChild(autoOption);
-
-                // Añadir las calidades disponibles en el .m3u8
-                levels.forEach((level, index) => {
-                    const option = document.createElement('option');
-                    option.value = index;
-                    // Si el m3u8 no tiene el nombre de la resolución, usamos la altura (height)
-                    const name = level.name || `${level.height}p` || `Opción ${index}`;
-                    option.text = name;
-                    qualitySelect.appendChild(option);
+                qualitySelect.innerHTML = '<option value="-1">Automático</option>';
+                hls.levels.forEach((lvl, idx) => {
+                    let opt = document.createElement('option');
+                    opt.value = idx;
+                    opt.text = lvl.name || `${lvl.height}p`;
+                    qualitySelect.appendChild(opt);
                 });
+                qualitySelect.addEventListener('change', (e) => { hls.currentLevel = parseInt(e.target.value); });
 
-                // Evento de cambio de calidad
-                qualitySelect.addEventListener('change', (e) => {
-                    hls.currentLevel = parseInt(e.target.value);
-                });
-            } else {
-                qualitySelect.innerHTML = '<option>Única calidad disponible</option>';
-            }
-        }
-
-        function setupAudioTracks(hls) {
-            const audioTracks = hls.audioTracks;
-            audioSelect.innerHTML = ''; // Limpiar
-
-            if (audioTracks && audioTracks.length > 1) {
-                audioSelect.disabled = false;
-
-                audioTracks.forEach((track, index) => {
-                    const option = document.createElement('option');
-                    option.value = index;
-                    option.text = track.name || track.lang || `Audio ${index + 1}`;
-                    if (index === hls.audioTrack) {
-                        option.selected = true;
-                    }
-                    audioSelect.appendChild(option);
-                });
-
-                // Evento de cambio de audio
-                audioSelect.addEventListener('change', (e) => {
-                    hls.audioTrack = parseInt(e.target.value);
-                });
-            } else {
-                audioSelect.innerHTML = '<option>Audio único / Estándar</option>';
-            }
+                // Configurar Audios en PC
+                if (hls.audioTracks.length > 1) {
+                    audioSelect.disabled = false;
+                    audioSelect.innerHTML = '';
+                    hls.audioTracks.forEach((track, idx) => {
+                        let opt = document.createElement('option');
+                        opt.value = idx;
+                        opt.text = track.name || `Audio ${idx + 1}`;
+                        if (idx === hls.audioTrack) opt.selected = true;
+                        audioSelect.appendChild(opt);
+                    });
+                    audioSelect.addEventListener('change', (e) => { hls.audioTrack = parseInt(e.target.value); });
+                } else {
+                    audioSelect.innerHTML = '<option>Audio Único</option>';
+                }
+            });
+        } else {
+            // Fallback genérico para Safari básico
+            video.src = streamUrl;
         }
     </script>
 
