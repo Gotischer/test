@@ -156,7 +156,10 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
                 <span id="current-track-name">Pista de audio: Analizando...</span>
             </div>
-            <div>
+            <div style="display: flex; gap: 10px;">
+                <select id="quality-selector" class="track-selector" style="display: none;">
+                    <option value="-1">Calidad Auto</option>
+                </select>
                 <select id="audio-track-selector" class="track-selector" style="display: none;">
                     <option value="">Cargando pistas...</option>
                 </select>
@@ -170,6 +173,7 @@
             const statusBadge = document.getElementById('status-badge');
             const currentTrackName = document.getElementById('current-track-name');
             const audioTrackSelector = document.getElementById('audio-track-selector');
+            const qualitySelector = document.getElementById('quality-selector');
             const videoSrc = 'https://nl-081-v1.vivocdn.xyz/1781472178/d287fcfed23a47848a33fe52f1299d4a/ysn6G-5tFnV68rmJ3RqsVMfRoSVVvmJGD6XSWQGAkXk/fox4k-usa.m3u8';
 
             // Función para actualizar la interfaz
@@ -329,8 +333,25 @@
 
                 window.hlsPlayer = hls;
 
-                hls.on(Hls.Events.MANIFEST_PARSED, function () {
+                hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
                     console.log('Manifiesto HLS cargado.');
+                    
+                    // Configurar selector de calidades (solo disponible en HLS.js)
+                    if (data && data.levels) {
+                        qualitySelector.style.display = 'block';
+                        qualitySelector.innerHTML = '<option value="-1">Calidad Auto</option>';
+                        data.levels.forEach((level, index) => {
+                            const option = document.createElement('option');
+                            option.value = index;
+                            option.textContent = (level.height ? level.height + 'p ' : '') + Math.round(level.bitrate / 1000) + ' kbps';
+                            qualitySelector.appendChild(option);
+                        });
+                        
+                        qualitySelector.addEventListener('change', (e) => {
+                            hls.currentLevel = parseInt(e.target.value, 10);
+                        });
+                    }
+
                     setTimeout(() => {
                         processAudioTracks(hls);
                     }, 500);
@@ -357,6 +378,7 @@
             else if (preferNative || video.canPlayType('application/vnd.apple.mpegurl')) {
                 video.src = videoSrc;
                 video.addEventListener('loadedmetadata', function () {
+                    video.play().catch(e => console.log('Autoplay bloqueado', e));
                     // Algunos navegadores nativos exponen las pistas de audio tarde
                     setTimeout(setupNativeTracks, 800);
                 });
