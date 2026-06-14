@@ -152,26 +152,31 @@
                 }
             });
 
-            // CAPTURADOR DE ERRORES CRÍTICO PARA SMART TV
+            // CAPTURADOR DE ERRORES DETALLADO
             hls.on(Hls.Events.ERROR, function (event, data) {
                 if (data.fatal) {
+                    // Obtener el código de estado HTTP si existe (Ej: 403, 404)
+                    let httpStatus = (data.response && data.response.code) ? data.response.code : "Sin respuesta (Posible CORS)";
+
                     switch (data.type) {
                         case Hls.ErrorTypes.NETWORK_ERROR:
-                            log("ERROR FATAL DE RED: El enlace no responde o bloqueó la TV (CORS/Token expirado). Intentando recuperar...");
-                            hls.startLoad();
+                            if (httpStatus === 403) {
+                                log("ERROR 403: Enlace expirado o tu IP fue bloqueada por el proveedor.");
+                            } else if (httpStatus === 404) {
+                                log("ERROR 404: El archivo .m3u8 ya no existe en el servidor.");
+                            } else {
+                                log(`ERROR DE RED (Código HTTP: ${httpStatus}): El servidor rechazó la TV o el navegador bloqueó la petición por CORS.`);
+                            }
                             break;
                         case Hls.ErrorTypes.MEDIA_ERROR:
-                            log("ERROR FATAL DE MEDIOS: Códec no soportado por la TV. Intentando decodificar de nuevo...");
+                            log("ERROR DE MEDIOS: Problema de códecs. Intentando recuperar...");
                             hls.recoverMediaError();
                             break;
                         default:
-                            log("ERROR FATAL NO RECUPERABLE: " + data.details);
+                            log(`ERROR NO RECUPERABLE: ${data.details} (HTTP: ${httpStatus})`);
                             hls.destroy();
                             break;
                     }
-                } else {
-                    // Errores no fatales (pérdida de frames, pequeños saltos)
-                    console.warn("Error interno ligero:", data.details);
                 }
             });
 
