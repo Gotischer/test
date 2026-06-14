@@ -4,169 +4,232 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reproductor TV & Web (CORS Patch)</title>
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+    <meta http-equiv="Content-Security-Policy" content="
+            default-src 'self' https://fonts.gstatic.com;
+            script-src 'self' 'unsafe-inline' https://ajax.googleapis.com;
+            style-src 'self' 'unsafe-inline' https://ajax.googleapis.com;
+            connect-src 'self' https://*.cbsivideo.com https://ajax.googleapis.com https://*.vivocdn.xyz;
+            img-src 'self' data: https://www.directvla.com;
+            media-src 'self' blob:;
+        ">
+    <title>DSPORTS</title>
+
+    <link rel="icon" type="image/png" href="https://www.directvla.com/favicon.ico">
+
+    <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/shaka-player/5.1.8/controls.css">
+
+    <script src="https://ajax.googleapis.com/ajax/libs/shaka-player/5.1.8/shaka-player.ui.js"></script>
+
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background-color: #0f0f0f;
-            color: #fff;
-            text-align: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             margin: 0;
-            padding: 10px;
+            padding: 20px;
         }
 
-        .player-container {
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        /* Contenedor del reproductor Shaka UI */
+        .video-container {
+            width: 100%;
             max-width: 800px;
-            margin: 0 auto;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
         }
 
         video {
             width: 100%;
-            background: #000;
-            border-radius: 8px;
+            height: auto;
         }
 
         .controls {
-            margin-top: 15px;
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-        }
-
-        select {
-            background: #222;
-            color: #fff;
-            padding: 10px;
-            border: 1px solid #444;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-
-        #debugLog {
             margin-top: 20px;
-            padding: 10px;
-            background: #1a1a1a;
-            color: #00ff00;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
             border-radius: 4px;
-            font-family: monospace;
-            font-size: 12px;
-            text-align: left;
-            max-height: 150px;
-            overflow-y: auto;
-            border: 1px solid #333;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        button.active {
+            background-color: #28a745;
+        }
+
+        #status {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #aaaaaa;
         }
     </style>
 </head>
 
 <body>
 
-    <div class="player-container">
-        <h2>Fox 4K Player (Bypass CORS Activo)</h2>
-        <video id="video" controls autoplay playsinline muted></video>
 
-        <div class="controls">
-            <div>
-                <label>Calidad:</label><br>
-                <select id="qualitySelect" disabled>
-                    <option>Esperando señal...</option>
-                </select>
-            </div>
-            <div>
-                <label>Audio:</label><br>
-                <select id="audioSelect" disabled>
-                    <option>Esperando señal...</option>
-                </select>
-            </div>
-        </div>
-
-        <div id="debugLog">Iniciando sistema...</div>
+    <div class="video-container" data-shaka-player-container>
+        <video id="video" data-shaka-player preload="none" autoplay></video>
     </div>
 
-    <script>
-        const video = document.getElementById('video');
-        const qualitySelect = document.getElementById('qualitySelect');
-        const audioSelect = document.getElementById('audioSelect');
-        const debugLog = document.getElementById('debugLog');
+    <div class="controls">
+        <button class="channel-btn active" data-id="dsports">DSPORTS</button>
+        <button class="channel-btn" data-id="dsports2">DSPORTS 2</button>
+        <button class="channel-btn" data-id="dsportsPlus">DSPORTS +</button>
+        <button class="channel-btn" data-id="fox">FOX (4K)</button>
+    </div>
 
-        function log(msg, isError = false) {
-            const color = isError ? "#ff4444" : "#00ff00";
-            debugLog.innerHTML += `<br><span style="color: ${color}">> ${msg}</span>`;
+    <div id="status"></div>
+
+    <script>
+        const channels = {
+            dsports: {
+                name: "DSPORTS",
+                manifest: "https://prope66bd35h.airspace-cdn.cbsivideo.com/out/v1/eb04c8bf15a94f14ad1d952659d422b7/manifest.mpd",
+                keyId: "9afc53e82bb24c20a5835a84138f6c13",
+                key: "abdd52917474f2342ff04f0d4722123a"
+            },
+            dsports2: {
+                name: "DSPORTS 2",
+                manifest: "https://prope79d3g55.airspace-cdn.cbsivideo.com/out/v1/faa5cf8cb19e4de99417df05a463f9d5/manifest.mpd",
+                keyId: "010b4fa338184f52a712121ad62ae9b4",
+                key: "e310bad2a570b60f7799e2aa0fb33a71"
+            },
+            dsportsPlus: {
+                name: "DSPORTS +",
+                manifest: "https://prope9660ag6.airspace-cdn.cbsivideo.com/out/v1/a634dbd5b8474f38b38a8ce37dd77b50/manifest.mpd",
+                keyId: "41121cea7a3d49a78c9496d1b0d919e4",
+                key: "de048d4c2870b8d53961aaeac1804947"
+            },
+            fox: {
+                name: "FOX",
+                manifest: "https://nl-081-v1.vivocdn.xyz/1781474919/b1a3f5029d4c4e829a30e6d08901ee85/rG2-IvMkzw9ihzSroICdfP7Bps4lCPpiZ5MCqdSP3Yk/fox4k-usa.m3u8",
+            }
+        };
+
+        let player;
+        let videoContainer;
+        const statusDiv = document.getElementById('status');
+        const buttons = document.querySelectorAll('.channel-btn');
+
+        async function initApp() {
+            shaka.polyfill.installAll();
+            if (shaka.Player.isBrowserSupported()) {
+                initPlayer();
+            } else {
+                statusDiv.innerText = "Error: Tu navegador no soporta Shaka Player.";
+            }
         }
 
-        // URL Original
-        const urlOriginal = 'https://nl-081-v1.vivocdn.xyz/1781474995/c075a3b56e6144ef9ab2638dea205f34/qHwDja898rB6sB4eV3OmDdj4IfndP_vZIg7ezk8CVWw/fox4k-usa.m3u8';
+        async function initPlayer() {
+            videoContainer = document.querySelector('[data-shaka-player-container]');
+            const video = document.querySelector('[data-shaka-player]');
+            const ui = video['ui'];
+            const controls = ui.getControls();
+            player = controls.getPlayer();
 
-        // Base del proxy para interceptar todo
-        const proxyBase = 'https://api.allorigins.win/raw?url=';
+            const config = {
+                'controlPanelElements': [
+                    'play_pause',
+                    'time_and_duration',
+                    'mute',
+                    'volume',
+                    'spacer',
+                    'overflow_menu',
+                    'fullscreen',
+                ],
+                'contextMenuElements': [
+                    'statistics',
+                ],
+                'overflowMenuButtons': [
+                    'quality',
+                    'statistics',
+                ],
+                'statisticsList': [
+                    'width',
+                    'height',
+                    'currentCodecs',
+                    'estimatedBandwidth',
+                    'streamBandwidth',
+                    'liveLatency',
+                    'bufferingTime',
+                    'stallsDetected',
+                ],
+            }
+            ui.configure(config);
 
-        if (Hls.isSupported()) {
-            log("Hls.js listo. Interceptando tráfico de red completo...");
+            player.configure({
+                streaming: {
+                    bufferingGoal: 16,
+                    bufferBehind: 10,
+                },
+            });
 
-            const hlsConfig = {
-                enableWorker: true,
-                maxBufferLength: 10,
-                maxBufferSize: 15 * 1024 * 1024,
+            player.addEventListener('error', onPlayerErrorEvent);
 
-                // CONGELAMOS LAS PETICIONES: Forzamos a que TODO pase por el proxy
-                xhrSetup: function (xhr, url) {
-                    // Si la petición no lleva ya el proxy, se lo inyectamos a la fuerza
-                    if (!url.startsWith(proxyBase)) {
-                        const urlConProxy = proxyBase + encodeURIComponent(url);
-                        xhr.open('GET', urlConProxy, true);
-                    }
-                }
-            };
-
-            const hls = new Hls(hlsConfig);
-            hls.loadSource(proxyBase + encodeURIComponent(urlOriginal));
-            hls.attachMedia(video);
-
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                log("¡Manifiesto y fragmentos enlazados mediante Proxy con éxito!");
-
-                // Configurar Calidades
-                qualitySelect.disabled = false;
-                qualitySelect.innerHTML = '<option value="-1">Automático</option>';
-                hls.levels.forEach((lvl, idx) => {
-                    let opt = document.createElement('option');
-                    opt.value = idx;
-                    opt.text = lvl.name || `${lvl.height}p`;
-                    qualitySelect.appendChild(opt);
+            buttons.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    buttons.forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    loadChannel(e.target.dataset.id);
                 });
-                qualitySelect.addEventListener('change', (e) => {
-                    hls.currentLevel = parseInt(e.target.value);
-                });
+            });
+            loadChannel('dsports')
+        }
 
-                // Configurar Audios
-                if (hls.audioTracks.length > 1) {
-                    audioSelect.disabled = false;
-                    audioSelect.innerHTML = '';
-                    hls.audioTracks.forEach((track, idx) => {
-                        let opt = document.createElement('option');
-                        opt.value = idx;
-                        opt.text = track.name || `Audio ${idx + 1}`;
-                        if (idx === hls.audioTrack) opt.selected = true;
-                        audioSelect.appendChild(opt);
-                    });
-                    audioSelect.addEventListener('change', (e) => {
-                        hls.audioTrack = parseInt(e.target.value);
-                    });
+        async function loadChannel(channelId) {
+            const channel = channels[channelId];
+            const clearKeysConfig = {};
+            clearKeysConfig[channel.keyId] = channel.key;
+
+            player.configure({
+                preferredAudio: [{
+                    channelCount: 6
+                }],
+                drm: {
+                    clearKeys: clearKeysConfig
                 }
             });
 
-            hls.on(Hls.Events.ERROR, function (event, data) {
-                if (data.fatal) {
-                    log(`Error Fatal reincidente: ${data.details}. Verificando token...`, true);
-                    hls.startLoad();
-                }
-            });
+            try {
+                await player.load(channel.manifest);
+            } catch (e) {
+                onPlayerError(e);
+            }
+        }
 
-        } else {
-            video.src = urlOriginal;
+        function onPlayerErrorEvent(event) {
+            onPlayerError(event.detail);
+        }
+
+        function onPlayerError(error) {
+            console.error('Error de Shaka Player', error);
+            statusDiv.innerText = `Error: Código ${error.code}`;
+        }
+
+        document.addEventListener('shaka-ui-loaded', initApp);
+        if (document.readyState === 'complete' && window.shaka) {
+            initApp();
         }
     </script>
-
 </body>
 
 </html>
