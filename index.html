@@ -4,19 +4,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reproductor Optimizado TV & Web</title>
+    <title>Reproductor HLS Optimizado para TV</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #0b0b0b;
+            background-color: #0f0f0f;
             color: #fff;
             text-align: center;
             margin: 0;
-            padding: 20px;
+            padding: 10px;
         }
 
-        .player-box {
+        .player-container {
             max-width: 800px;
             margin: 0 auto;
         }
@@ -24,136 +24,159 @@
         video {
             width: 100%;
             background: #000;
-            border-radius: 6px;
+            border-radius: 8px;
         }
 
         .controls {
             margin-top: 15px;
             display: flex;
-            gap: 10px;
+            gap: 15px;
             justify-content: center;
         }
 
         select {
             background: #222;
             color: #fff;
-            padding: 8px;
+            padding: 10px;
             border: 1px solid #444;
             border-radius: 4px;
+            font-size: 14px;
         }
 
-        .info-tag {
+        /* Consola de errores en pantalla para la TV */
+        #debugLog {
+            margin-top: 20px;
+            padding: 10px;
+            background: #200;
+            color: #ff8888;
+            border-radius: 4px;
+            font-family: monospace;
             font-size: 12px;
-            color: #888;
-            margin-top: 5px;
+            text-align: left;
+            max-height: 150px;
+            overflow-y: auto;
+            display: block;
         }
     </style>
 </head>
 
 <body>
 
-    <div class="player-box">
-        <h2>Fox 4K Player</h2>
+    <div class="player-container">
+        <h2>Fox 4K Player (TV & Web)</h2>
         <video id="video" controls autoplay playsinline muted></video>
 
         <div class="controls">
             <div>
-                <label>Calidad:</label>
+                <label>Calidad:</label><br>
                 <select id="qualitySelect" disabled>
-                    <option>Detectando...</option>
+                    <option>Cargando...</option>
                 </select>
             </div>
             <div>
-                <label>Audio:</label>
+                <label>Audio:</label><br>
                 <select id="audioSelect" disabled>
-                    <option>Detectando...</option>
+                    <option>Cargando...</option>
                 </select>
             </div>
         </div>
-        <div id="modeInfo" class="info-tag"></div>
+
+        <div id="debugLog">Sistemas listos. Esperando flujo de video...</div>
     </div>
 
     <script>
         const video = document.getElementById('video');
         const qualitySelect = document.getElementById('qualitySelect');
         const audioSelect = document.getElementById('audioSelect');
-        const modeInfo = document.getElementById('modeInfo');
+        const debugLog = document.getElementById('debugLog');
 
+        function log(msg) {
+            debugLog.innerHTML += "<br>> " + msg;
+            console.log(msg);
+        }
+
+        // Tu URL
         const streamUrl = 'https://nl-081-v1.vivocdn.xyz/1781474995/c075a3b56e6144ef9ab2638dea205f34/qHwDja898rB6sB4eV3OmDdj4IfndP_vZIg7ezk8CVWw/fox4k-usa.m3u8';
 
-        // DETECCIÓN CRÍTICA: ¿Es una Smart TV o dispositivo similar?
-        const ua = navigator.userAgent.toLowerCase();
-        const isSmartTV = ua.includes("tizen") || ua.includes("smarttv") || ua.includes("googletv") || ua.includes("appletv") || ua.includes("lgbrowser");
+        if (Hls.isSupported()) {
+            log("Hls.js soportado. Configurando modo TV de bajo consumo...");
 
-        // EJECUCIÓN SEGÚN EL ENTORNO
-        if (isSmartTV) {
-            // MODO TV: Máxima estabilidad, decodificación por hardware nativa para evitar congelamientos
-            modeInfo.innerText = "Modo: Smart TV (Reproducción Nativa por Hardware)";
-            video.src = streamUrl;
+            // CONFIGURACIÓN ULTRA-OPTIMIZADA PARA SMART TV
+            const hlsConfig = {
+                enableWorker: true,        // Mueve el procesamiento a otro hilo para que la TV no se trabe
+                maxBufferLength: 10,       // Reduce el buffer a 10 segundos (evita saturar la memoria RAM de la TV)
+                maxMaxBufferLength: 15,
+                maxBufferSize: 15 * 1024 * 1024, // Máximo 15MB de buffer en RAM
+                maxBufferHole: 0.5,
+                lowLatencyMode: false      // Desactivado para dar más estabilidad en conexiones lentas o TVs
+            };
 
-            video.addEventListener('loadedmetadata', () => {
-                // En TV, el sistema adapta la calidad automáticamente (ABR) para evitar cortes
-                qualitySelect.innerHTML = '<option>Automático (Optimizado por TV)</option>';
-
-                // Intentar leer audios nativos si la TV los expone
-                if (video.audioTracks && video.audioTracks.length > 1) {
-                    audioSelect.disabled = false;
-                    audioSelect.innerHTML = '';
-                    for (let i = 0; i < video.audioTracks.length; i++) {
-                        let track = video.audioTracks[i];
-                        let opt = document.createElement('option');
-                        opt.value = i;
-                        opt.text = track.label || track.language || `Audio ${i + 1}`;
-                        if (track.enabled) opt.selected = true;
-                        audioSelect.appendChild(opt);
-                    }
-                    audioSelect.addEventListener('change', (e) => {
-                        for (let i = 0; i < video.audioTracks.length; i++) {
-                            video.audioTracks[i].enabled = (i == e.target.value);
-                        }
-                    });
-                } else {
-                    audioSelect.innerHTML = '<option>Por defecto de la señal</option>';
-                }
-            });
-
-        } else if (Hls.isSupported()) {
-            // MODO WEB: Navegadores de PC/Móviles donde JS sí tiene potencia para procesar
-            modeInfo.innerText = "Modo: Web Estándar (Hls.js)";
-            const hls = new Hls();
+            const hls = new Hls(hlsConfig);
             hls.loadSource(streamUrl);
             hls.attachMedia(video);
 
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                // Configurar Calidades en PC
+                log("¡Manifiesto cargado con éxito! Configurando selectores...");
+
+                // 1. CONTROL DE CALIDAD
                 qualitySelect.disabled = false;
-                qualitySelect.innerHTML = '<option value="-1">Automático</option>';
+                qualitySelect.innerHTML = '<option value="-1">Automático (Recomendado)</option>';
                 hls.levels.forEach((lvl, idx) => {
                     let opt = document.createElement('option');
                     opt.value = idx;
-                    opt.text = lvl.name || `${lvl.height}p`;
+                    opt.text = lvl.name || `${lvl.height}p (${Math.round(lvl.bitrate / 1000)}kbps)`;
                     qualitySelect.appendChild(opt);
                 });
-                qualitySelect.addEventListener('change', (e) => { hls.currentLevel = parseInt(e.target.value); });
+                qualitySelect.addEventListener('change', (e) => {
+                    log("Cambiando calidad a nivel: " + e.target.value);
+                    hls.currentLevel = parseInt(e.target.value);
+                });
 
-                // Configurar Audios en PC
+                // 2. CONTROL DE AUDIO
                 if (hls.audioTracks.length > 1) {
                     audioSelect.disabled = false;
                     audioSelect.innerHTML = '';
                     hls.audioTracks.forEach((track, idx) => {
                         let opt = document.createElement('option');
                         opt.value = idx;
-                        opt.text = track.name || `Audio ${idx + 1}`;
+                        opt.text = track.name || `Idioma ${idx + 1}`;
                         if (idx === hls.audioTrack) opt.selected = true;
                         audioSelect.appendChild(opt);
                     });
-                    audioSelect.addEventListener('change', (e) => { hls.audioTrack = parseInt(e.target.value); });
+                    audioSelect.addEventListener('change', (e) => {
+                        log("Cambiando idioma de audio a: " + e.target.value);
+                        hls.audioTrack = parseInt(e.target.value);
+                    });
                 } else {
                     audioSelect.innerHTML = '<option>Audio Único</option>';
                 }
             });
+
+            // CAPTURADOR DE ERRORES CRÍTICO PARA SMART TV
+            hls.on(Hls.Events.ERROR, function (event, data) {
+                if (data.fatal) {
+                    switch (data.type) {
+                        case Hls.ErrorTypes.NETWORK_ERROR:
+                            log("ERROR FATAL DE RED: El enlace no responde o bloqueó la TV (CORS/Token expirado). Intentando recuperar...");
+                            hls.startLoad();
+                            break;
+                        case Hls.ErrorTypes.MEDIA_ERROR:
+                            log("ERROR FATAL DE MEDIOS: Códec no soportado por la TV. Intentando decodificar de nuevo...");
+                            hls.recoverMediaError();
+                            break;
+                        default:
+                            log("ERROR FATAL NO RECUPERABLE: " + data.details);
+                            hls.destroy();
+                            break;
+                    }
+                } else {
+                    // Errores no fatales (pérdida de frames, pequeños saltos)
+                    console.warn("Error interno ligero:", data.details);
+                }
+            });
+
         } else {
-            // Fallback genérico para Safari básico
+            log("Hls.js no es soportado. Usando fallback nativo (Ej: Safari)...");
             video.src = streamUrl;
         }
     </script>
