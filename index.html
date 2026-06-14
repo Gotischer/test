@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reproductor HLS Optimizado para TV</title>
+    <title>Reproductor TV & Web (CORS Patch)</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
     <style>
         body {
@@ -43,19 +43,18 @@
             font-size: 14px;
         }
 
-        /* Consola de errores en pantalla para la TV */
         #debugLog {
             margin-top: 20px;
             padding: 10px;
-            background: #200;
-            color: #ff8888;
+            background: #1a1a1a;
+            color: #00ff00;
             border-radius: 4px;
             font-family: monospace;
             font-size: 12px;
             text-align: left;
             max-height: 150px;
             overflow-y: auto;
-            display: block;
+            border: 1px solid #333;
         }
     </style>
 </head>
@@ -63,25 +62,25 @@
 <body>
 
     <div class="player-container">
-        <h2>Fox 4K Player (TV & Web)</h2>
+        <h2>Fox 4K Player (Bypass CORS Activo)</h2>
         <video id="video" controls autoplay playsinline muted></video>
 
         <div class="controls">
             <div>
                 <label>Calidad:</label><br>
                 <select id="qualitySelect" disabled>
-                    <option>Cargando...</option>
+                    <option>Esperando señal...</option>
                 </select>
             </div>
             <div>
                 <label>Audio:</label><br>
                 <select id="audioSelect" disabled>
-                    <option>Cargando...</option>
+                    <option>Esperando señal...</option>
                 </select>
             </div>
         </div>
 
-        <div id="debugLog">Sistemas listos. Esperando flujo de video...</div>
+        <div id="debugLog">Iniciando sistema...</div>
     </div>
 
     <script>
@@ -90,25 +89,27 @@
         const audioSelect = document.getElementById('audioSelect');
         const debugLog = document.getElementById('debugLog');
 
-        function log(msg) {
-            debugLog.innerHTML += "<br>> " + msg;
+        function log(msg, isError = false) {
+            const color = isError ? "#ff4444" : "#00ff00";
+            debugLog.innerHTML += `<br><span style="color: ${color}">> ${msg}</span>`;
             console.log(msg);
         }
 
-        // Tu URL
-        const streamUrl = 'https://nl-081-v1.vivocdn.xyz/1781474995/c075a3b56e6144ef9ab2638dea205f34/qHwDja898rB6sB4eV3OmDdj4IfndP_vZIg7ezk8CVWw/fox4k-usa.m3u8';
+        // URL Original de tu streaming
+        const urlOriginal = 'https://nl-081-v1.vivocdn.xyz/1781474995/c075a3b56e6144ef9ab2638dea205f34/qHwDja898rB6sB4eV3OmDdj4IfndP_vZIg7ezk8CVWw/fox4k-usa.m3u8';
+
+        // PARCHE: Pasamos la URL a través de un proxy inverso para romper el bloqueo CORS de la TV
+        const streamUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(urlOriginal);
 
         if (Hls.isSupported()) {
-            log("Hls.js soportado. Configurando modo TV de bajo consumo...");
+            log("Hls.js cargado. Solicitando video mediante Proxy CORS...");
 
-            // CONFIGURACIÓN ULTRA-OPTIMIZADA PARA SMART TV
             const hlsConfig = {
-                enableWorker: true,        // Mueve el procesamiento a otro hilo para que la TV no se trabe
-                maxBufferLength: 10,       // Reduce el buffer a 10 segundos (evita saturar la memoria RAM de la TV)
+                enableWorker: true,
+                maxBufferLength: 10,
                 maxMaxBufferLength: 15,
-                maxBufferSize: 15 * 1024 * 1024, // Máximo 15MB de buffer en RAM
-                maxBufferHole: 0.5,
-                lowLatencyMode: false      // Desactivado para dar más estabilidad en conexiones lentas o TVs
+                maxBufferSize: 15 * 1024 * 1024,
+                lowLatencyMode: false
             };
 
             const hls = new Hls(hlsConfig);
@@ -116,9 +117,9 @@
             hls.attachMedia(video);
 
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                log("¡Manifiesto cargado con éxito! Configurando selectores...");
+                log("¡Conexión establecida con éxito! El servidor aceptó la TV.");
 
-                // 1. CONTROL DE CALIDAD
+                // 1. CONFIGURACIÓN DE RESOLUCIONES
                 qualitySelect.disabled = false;
                 qualitySelect.innerHTML = '<option value="-1">Automático (Recomendado)</option>';
                 hls.levels.forEach((lvl, idx) => {
@@ -128,11 +129,11 @@
                     qualitySelect.appendChild(opt);
                 });
                 qualitySelect.addEventListener('change', (e) => {
-                    log("Cambiando calidad a nivel: " + e.target.value);
+                    log("Cambiando resolución a nivel: " + e.target.value);
                     hls.currentLevel = parseInt(e.target.value);
                 });
 
-                // 2. CONTROL DE AUDIO
+                // 2. CONFIGURACIÓN DE AUDIOS
                 if (hls.audioTracks.length > 1) {
                     audioSelect.disabled = false;
                     audioSelect.innerHTML = '';
@@ -144,36 +145,34 @@
                         audioSelect.appendChild(opt);
                     });
                     audioSelect.addEventListener('change', (e) => {
-                        log("Cambiando idioma de audio a: " + e.target.value);
+                        log("Cambiando pista de audio a: " + e.target.value);
                         hls.audioTrack = parseInt(e.target.value);
                     });
                 } else {
-                    audioSelect.innerHTML = '<option>Audio Único</option>';
+                    audioSelect.innerHTML = '<option>Audio Único Detectado</option>';
                 }
             });
 
-            // CAPTURADOR DE ERRORES DETALLADO
+            // CONTROLADOR AVANZADO DE ERRORES EN PANTALLA
             hls.on(Hls.Events.ERROR, function (event, data) {
                 if (data.fatal) {
-                    // Obtener el código de estado HTTP si existe (Ej: 403, 404)
-                    let httpStatus = (data.response && data.response.code) ? data.response.code : "Sin respuesta (Posible CORS)";
+                    let httpStatus = (data.response && data.response.code) ? data.response.code : "CORS / Sin Respuesta";
 
                     switch (data.type) {
                         case Hls.ErrorTypes.NETWORK_ERROR:
-                            if (httpStatus === 403) {
-                                log("ERROR 403: Enlace expirado o tu IP fue bloqueada por el proveedor.");
-                            } else if (httpStatus === 404) {
-                                log("ERROR 404: El archivo .m3u8 ya no existe en el servidor.");
+                            if (httpStatus === 403 || httpStatus === 404) {
+                                log(`ERROR EN CONEXIÓN: El enlace m3u8 ha expirado en el servidor (HTTP ${httpStatus}).`, true);
                             } else {
-                                log(`ERROR DE RED (Código HTTP: ${httpStatus}): El servidor rechazó la TV o el navegador bloqueó la petición por CORS.`);
+                                log(`ERROR DE RED: Los segmentos de video (.ts) también requieren proxy o el token expiró.`, true);
                             }
+                            hls.startLoad();
                             break;
                         case Hls.ErrorTypes.MEDIA_ERROR:
-                            log("ERROR DE MEDIOS: Problema de códecs. Intentando recuperar...");
+                            log("ERROR DE MEDIOS: Formato incompatible. Intentando forzar decodificación...", true);
                             hls.recoverMediaError();
                             break;
                         default:
-                            log(`ERROR NO RECUPERABLE: ${data.details} (HTTP: ${httpStatus})`);
+                            log(`ERROR FATAL: ${data.details}`, true);
                             hls.destroy();
                             break;
                     }
@@ -181,7 +180,7 @@
             });
 
         } else {
-            log("Hls.js no es soportado. Usando fallback nativo (Ej: Safari)...");
+            log("Hls.js no es compatible con este sistema. Intentando reproducción directa...", true);
             video.src = streamUrl;
         }
     </script>
