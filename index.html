@@ -92,96 +92,78 @@
         function log(msg, isError = false) {
             const color = isError ? "#ff4444" : "#00ff00";
             debugLog.innerHTML += `<br><span style="color: ${color}">> ${msg}</span>`;
-            console.log(msg);
         }
 
-        // URL Original de tu streaming
+        // URL Original
         const urlOriginal = 'https://nl-081-v1.vivocdn.xyz/1781474995/c075a3b56e6144ef9ab2638dea205f34/qHwDja898rB6sB4eV3OmDdj4IfndP_vZIg7ezk8CVWw/fox4k-usa.m3u8';
 
-        // PARCHE: Pasamos la URL a través de un proxy inverso para romper el bloqueo CORS de la TV
-        const streamUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(urlOriginal);
+        // Base del proxy para interceptar todo
+        const proxyBase = 'https://api.allorigins.win/raw?url=';
 
         if (Hls.isSupported()) {
-            log("Hls.js cargado. Solicitando video mediante Proxy CORS...");
+            log("Hls.js listo. Interceptando tráfico de red completo...");
 
             const hlsConfig = {
                 enableWorker: true,
                 maxBufferLength: 10,
-                maxMaxBufferLength: 15,
                 maxBufferSize: 15 * 1024 * 1024,
-                lowLatencyMode: false
+
+                // CONGELAMOS LAS PETICIONES: Forzamos a que TODO pase por el proxy
+                xhrSetup: function (xhr, url) {
+                    // Si la petición no lleva ya el proxy, se lo inyectamos a la fuerza
+                    if (!url.startsWith(proxyBase)) {
+                        const urlConProxy = proxyBase + encodeURIComponent(url);
+                        xhr.open('GET', urlConProxy, true);
+                    }
+                }
             };
 
             const hls = new Hls(hlsConfig);
-            hls.loadSource(streamUrl);
+            hls.loadSource(proxyBase + encodeURIComponent(urlOriginal));
             hls.attachMedia(video);
 
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                log("¡Conexión establecida con éxito! El servidor aceptó la TV.");
+                log("¡Manifiesto y fragmentos enlazados mediante Proxy con éxito!");
 
-                // 1. CONFIGURACIÓN DE RESOLUCIONES
+                // Configurar Calidades
                 qualitySelect.disabled = false;
-                qualitySelect.innerHTML = '<option value="-1">Automático (Recomendado)</option>';
+                qualitySelect.innerHTML = '<option value="-1">Automático</option>';
                 hls.levels.forEach((lvl, idx) => {
                     let opt = document.createElement('option');
                     opt.value = idx;
-                    opt.text = lvl.name || `${lvl.height}p (${Math.round(lvl.bitrate / 1000)}kbps)`;
+                    opt.text = lvl.name || `${lvl.height}p`;
                     qualitySelect.appendChild(opt);
                 });
                 qualitySelect.addEventListener('change', (e) => {
-                    log("Cambiando resolución a nivel: " + e.target.value);
                     hls.currentLevel = parseInt(e.target.value);
                 });
 
-                // 2. CONFIGURACIÓN DE AUDIOS
+                // Configurar Audios
                 if (hls.audioTracks.length > 1) {
                     audioSelect.disabled = false;
                     audioSelect.innerHTML = '';
                     hls.audioTracks.forEach((track, idx) => {
                         let opt = document.createElement('option');
                         opt.value = idx;
-                        opt.text = track.name || `Idioma ${idx + 1}`;
+                        opt.text = track.name || `Audio ${idx + 1}`;
                         if (idx === hls.audioTrack) opt.selected = true;
                         audioSelect.appendChild(opt);
                     });
                     audioSelect.addEventListener('change', (e) => {
-                        log("Cambiando pista de audio a: " + e.target.value);
                         hls.audioTrack = parseInt(e.target.value);
                     });
-                } else {
-                    audioSelect.innerHTML = '<option>Audio Único Detectado</option>';
                 }
             });
 
-            // CONTROLADOR AVANZADO DE ERRORES EN PANTALLA
             hls.on(Hls.Events.ERROR, function (event, data) {
                 if (data.fatal) {
-                    let httpStatus = (data.response && data.response.code) ? data.response.code : "CORS / Sin Respuesta";
-
-                    switch (data.type) {
-                        case Hls.ErrorTypes.NETWORK_ERROR:
-                            if (httpStatus === 403 || httpStatus === 404) {
-                                log(`ERROR EN CONEXIÓN: El enlace m3u8 ha expirado en el servidor (HTTP ${httpStatus}).`, true);
-                            } else {
-                                log(`ERROR DE RED: Los segmentos de video (.ts) también requieren proxy o el token expiró.`, true);
-                            }
-                            hls.startLoad();
-                            break;
-                        case Hls.ErrorTypes.MEDIA_ERROR:
-                            log("ERROR DE MEDIOS: Formato incompatible. Intentando forzar decodificación...", true);
-                            hls.recoverMediaError();
-                            break;
-                        default:
-                            log(`ERROR FATAL: ${data.details}`, true);
-                            hls.destroy();
-                            break;
-                    }
+                    log(`Error Fatal reincidente: ${data.details}. Verificando token...`, true);
+                    hls.startLoad();
                 }
             });
 
         } else {
-            log("Hls.js no es compatible con este sistema. Intentando reproducción directa...", true);
-            video.src = streamUrl;
+            video.src = urlOriginal;
         }
     </script>
 
