@@ -8,9 +8,10 @@
             default-src 'self' https://fonts.gstatic.com;
             script-src 'self' 'unsafe-inline' https://ajax.googleapis.com;
             style-src 'self' 'unsafe-inline' https://ajax.googleapis.com;
-            connect-src 'self' https://*.cbsivideo.com https://ajax.googleapis.com https://*.vivocdn.xyz;
+            connect-src 'self' https://*.cbsivideo.com https://ajax.googleapis.com https://*.vivocdn.xyz https://*.pages.dev http://localhost:8080;
             img-src 'self' data: https://www.directvla.com;
             media-src 'self' blob:;
+            frame-src 'self' https://*.pages.dev;
         ">
     <title>DSPORTS</title>
 
@@ -40,6 +41,9 @@
         .video-container {
             width: 100%;
             max-width: 800px;
+            aspect-ratio: 16 / 9;
+            position: relative;
+            background-color: #000;
             border-radius: 8px;
             overflow: hidden;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
@@ -47,7 +51,17 @@
 
         video {
             width: 100%;
-            height: auto;
+            height: 100%;
+        }
+
+        #iframe-player {
+            width: 100%;
+            height: 100%;
+            border: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 10;
         }
 
         .controls {
@@ -78,7 +92,17 @@
         #status {
             margin-top: 15px;
             font-size: 14px;
-            color: #aaaaaa;
+            color: #ff6b6b;
+            background: #1e1e1e;
+            padding: 10px;
+            border-radius: 4px;
+            width: 100%;
+            max-width: 800px;
+            box-sizing: border-box;
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid #333;
+            font-family: monospace;
         }
     </style>
 </head>
@@ -88,6 +112,7 @@
 
     <div class="video-container" data-shaka-player-container>
         <video id="video" data-shaka-player preload="none" autoplay></video>
+        <iframe id="iframe-player" style="display:none;" allowfullscreen allow="autoplay; encrypted-media"></iframe>
     </div>
 
     <div class="controls">
@@ -95,6 +120,7 @@
         <button class="channel-btn" data-id="dsports2">DSPORTS 2</button>
         <button class="channel-btn" data-id="dsportsPlus">DSPORTS +</button>
         <button class="channel-btn" data-id="fox">FOX (4K)</button>
+        <button class="channel-btn" data-id="telemundo">TELEMUNDO (4K)</button>
     </div>
 
     <div id="status"></div>
@@ -122,6 +148,10 @@
             fox: {
                 name: "FOX",
                 manifest: "https://nl-081-v1.vivocdn.xyz/1781474995/c075a3b56e6144ef9ab2638dea205f34/qHwDja898rB6sB4eV3OmDdj4IfndP_vZIg7ezk8CVWw/fox4k-usa.m3u8",
+            },
+            telemundo: {
+                name: "TELEMUNDO",
+                iframe: "https://findleembeds.pages.dev/embed/telemundo-4k"
             }
         };
 
@@ -130,12 +160,18 @@
         const statusDiv = document.getElementById('status');
         const buttons = document.querySelectorAll('.channel-btn');
 
+        function logMessage(msg) {
+            const time = new Date().toLocaleTimeString();
+            statusDiv.innerHTML = `<div style="margin-bottom:4px;"><span style="color:#888;">[${time}]</span> ${msg}</div>` + statusDiv.innerHTML;
+        }
+
         async function initApp() {
             shaka.polyfill.installAll();
             if (shaka.Player.isBrowserSupported()) {
+                logMessage("Shaka Player soportado e inicializado.");
                 initPlayer();
             } else {
-                statusDiv.innerText = "Error: Tu navegador no soporta Shaka Player.";
+                logMessage("Error: Tu navegador no soporta Shaka Player.");
             }
         }
 
@@ -197,20 +233,42 @@
 
         async function loadChannel(channelId) {
             const channel = channels[channelId];
+            const iframePlayer = document.getElementById('iframe-player');
+            const videoElement = document.getElementById('video');
+
+            if (channel.iframe) {
+                // Es un canal protegido que requiere iframe
+                try { await player.unload(); } catch (e) { }
+                videoElement.style.display = 'none';
+                iframePlayer.style.display = 'block';
+                iframePlayer.src = channel.iframe;
+                logMessage(`Cargando iframe: ${channel.name}...`);
+                return;
+            }
+
+            // Es un canal nativo de Shaka Player
+            iframePlayer.style.display = 'none';
+            iframePlayer.src = '';
+            videoElement.style.display = 'block';
+
             const clearKeysConfig = {};
-            clearKeysConfig[channel.keyId] = channel.key;
+            if (channel.keyId && channel.key) {
+                clearKeysConfig[channel.keyId] = channel.key;
+            }
 
             player.configure({
                 preferredAudio: [{
                     channelCount: 6
                 }],
                 drm: {
-                    clearKeys: clearKeysConfig
+                    clearKeys: Object.keys(clearKeysConfig).length > 0 ? clearKeysConfig : {}
                 }
             });
 
             try {
+                logMessage(`Cargando canal: ${channel.name}...`);
                 await player.load(channel.manifest);
+                logMessage(`Reproduciendo: ${channel.name}`);
             } catch (e) {
                 onPlayerError(e);
             }
@@ -222,7 +280,8 @@
 
         function onPlayerError(error) {
             console.error('Error de Shaka Player', error);
-            statusDiv.innerText = `Error: Código ${error.code}`;
+            const errMsg = error.message || (error.data && error.data[0] ? error.data[0].message : 'Error desconocido');
+            logMessage(`Error: Código ${error.code} - ${errMsg || ''}`);
         }
 
         document.addEventListener('shaka-ui-loaded', initApp);
