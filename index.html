@@ -8,7 +8,7 @@
             default-src 'self' https://fonts.gstatic.com;
             script-src 'self' 'unsafe-inline' https://ajax.googleapis.com;
             style-src 'self' 'unsafe-inline' https://ajax.googleapis.com;
-            connect-src 'self' https://*.cbsivideo.com https://ajax.googleapis.com https://*.vivocdn.xyz https://*.pages.dev http://localhost:8080;
+            connect-src 'self' https://*.cbsivideo.com https://ajax.googleapis.com https://*.vivocdn.xyz https://*.pages.dev https://vizio.kuvuslov.cymru http://localhost:8080;
             img-src 'self' data: https://www.directvla.com;
             media-src 'self' blob:;
             frame-src 'self' https://*.pages.dev;
@@ -120,6 +120,7 @@
         <button class="channel-btn" data-id="dsports2">DSPORTS 2</button>
         <button class="channel-btn" data-id="dsportsPlus">DSPORTS +</button>
         <button class="channel-btn" data-id="fox">FOX (4K)</button>
+        <button class="channel-btn" data-id="fs1">FS1 (4K)</button>
         <button class="channel-btn" data-id="telemundo">TELEMUNDO (4K)</button>
     </div>
 
@@ -151,7 +152,11 @@
             },
             telemundo: {
                 name: "TELEMUNDO",
-                iframe: "https://findleembeds.pages.dev/embed/telemundo-4k"
+                manifest: "https://vizio.kuvuslov.cymru/telemundo-4k/index.m3u8"
+            },
+            fs1: {
+                name: "FS1",
+                manifest: "https://vizio.kuvuslov.cymru/fs1-4k/index.m3u8"
             }
         };
 
