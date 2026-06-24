@@ -247,6 +247,15 @@
                 videoElement.style.display = 'none';
                 iframePlayer.style.display = 'block';
                 iframePlayer.src = channel.iframe;
+                
+                if (iframePlayer.requestFullscreen) {
+                    iframePlayer.requestFullscreen().catch(err => console.error("Error al intentar pantalla completa:", err));
+                } else if (iframePlayer.webkitRequestFullscreen) { /* Safari */
+                    iframePlayer.webkitRequestFullscreen();
+                } else if (iframePlayer.msRequestFullscreen) { /* IE11 */
+                    iframePlayer.msRequestFullscreen();
+                }
+
                 logMessage(`Cargando iframe: ${channel.name}...`);
                 return;
             }
